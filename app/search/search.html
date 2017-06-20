@@ -30,56 +30,55 @@
         </p>
     </div>
 
+
     <div ng-repeat="result in results" class="search-result-i">
 
         <div class="search-result-i">
             <p class="search-result-title">
-                {{ result.title }}
+                {{ result.Package }}
             </p>
             <p class="search-result-description">
-                <a class="search-result-description" href="https://archive.org/details/{{result.identifier}}">{{ result.identifier }}</a>
+                <a target="_blank" class="search-result-description" href="{{result.Homepage}}">{{ result.Homepage }}</a>
             </p>
             <p class="multiline-text">
-                {{ result.description }}
+                {{ result.Description }}
+            </p>
+            <p class="smultiline-text">
+                Maintainer: {{ result.Maintainer }}
+            </p>
+            <p class="multiline-text">
+                Architecture: {{ result.Architecture }}
+            </p>
+            <p class="multiline-text">
+                Version: {{ result.Version }}
             </p>
             <p class="search-result-date">
-                {{result.humanDate}}
+                SHA1: {{ result.SHA1 }}
             </p>
 
-            <a class="search-result-toggle-files"
-               ng-click="download($event,result.identifier)"
-               ng-class="{'search-result-toggle-files_loader': result.loading == true }"
-               ng-hidden="result.files.length > 0 " style="cursor: pointer;">Show files</a>
-            <!-- <a href="#" class="search-result-toggle-files">Hide files</a> -->
-            <!-- <a href="#" class="search-result-toggle-files search-result-toggle-files_loader">Show files</a> -->
-
-        </div>
-
-        <div class="search-result-files">
-            <div class="search-result-files-tr" ng-repeat="file in result.files" ng-class="{'search-result-files-tr_noticed': file.success !== '' || file.error !== '' }">
-                <div class="search-result-files-td search-result-files-td_name">
-                    <a download target="_blank" href="{{file.url}}">{{file._name}}</a>
-                    &nbsp;&nbsp;<span style="color:gray;">{{file.humanFileSize}}</span>
-                </div>
-                <div class="search-result-files-td search-result-files-td_hash" style="text-align: right;">
-                    <span style="font-family: courier; font-size: small;">{{file.sha1}}</span>
-                </div>
-                <div class="search-result-files-td search-result-files-td_download" style="width:130px;">
-                    <div ng-show="file.download && file.exist" ><a class="search-result-files-download" ng-click="getOts(result.identifier,file.sha1,file._name)" style="cursor: pointer;">OTS Timestamp</a></div>
-                    <div ng-hide="file.download || !file.exist" ><a class="search-result-files-view" target="_blank" href="https://opentimestamps.org/info.html?ots={{file.ots}}">Show Timestamp</a></div>
-                </div>
-                <div class="search-result-files-notice" ng-show="file.success !== '' && file.error === '' ">
-                    <p ng-bind-html="trust(file.success)"></p>
-                </div>
-                <div class="search-result-files-error" ng-show="file.error != ''">
-                    <p ng-bind-html="trust(file.error)"></p>
+            <div class="search-result-files">
+                <div class="search-result-files-tr" ng-class="{'search-result-files-tr_noticed': result.success !== '' || result.error !== '' }">
+                    <div class="search-result-files-td search-result-files-td_name">
+                        <a download target="_blank" href="http://http://archive.ubuntu.com/ubuntu/{{result.Filename}}">{{result.Filename}}</a>
+                        &nbsp;&nbsp;<span style="color:gray;">{{result.humanFileSize}}</span>
+                    </div>
+                    <div class="search-result-files-td search-result-files-td_hash" style="text-align: right;">
+                        <span style="font-family: courier; font-size: small;">{{result.SHA1}}</span>
+                    </div>
+                    <div class="search-result-files-td search-result-files-td_download" style="width:130px;">
+                        <div><a class="search-result-files-download" ng-click="getOts(result)" style="cursor: pointer;">OTS Timestamp</a></div>
+                        <div><a class="search-result-files-view" target="_blank" href="https://opentimestamps.org/info.html?ots={{result.ots}}">Show Timestamp</a></div>
+                    </div>
+                    <div class="search-result-files-notice" ng-show="result.success !== '' && result.error === '' ">
+                        <p ng-bind-html="trust(result.success)"></p>
+                    </div>
+                    <div class="search-result-files-error" ng-show="result.error != ''">
+                        <p ng-bind-html="trust(result.error)"></p>
+                    </div>
                 </div>
             </div>
+
         </div>
     </div>
 
-
-    <div style="text-align: center; margin:30px; cursor: pointer;">
-        <b><a ng-click="loadMore()" ng-show="showMore && !showLoader">Load more results...</a></b>
-    </div>
 </section>

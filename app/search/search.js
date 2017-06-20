@@ -10,31 +10,74 @@ angular.module('myApp.search', ['ngRoute'])
   });
 }])
 
-    .factory('ArchiveService', function($http,$sce) {
+    .factory('ArchiveService', function($http) {
         return {
-            search: function(string,page) {
-                //https://archive.org/advancedsearch.php?q=opentimestamps&fl%5B%5D=description&fl%5B%5D=identifier&fl%5B%5D=publicdate&fl%5B%5D=title&sort%5B%5D=&sort%5B%5D=&sort%5B%5D=&rows=50&page=1&output=json&callback=callback&save=yes#raw
-                var url = "https://archive.org/advancedsearch.php";
-                var params = "q="+string+"&rows=50&page="+page+"&output=json&callback=JSON_CALLBACK&save=yes#raw";
-                $sce.trustAsResourceUrl(url+"?"+params);
-                return $http.jsonp(url+"?"+params);
-            },
-            download: function(identifier) {
-                //https://archive.org/download/opentimestamps-calendar-backups/opentimestamps-calendar-backups_files.xml
-                // redirect to : 'https://ia801509.us.archive.org/13/items/opentimestamps-calendar-backups/opentimestamps-calendar-backups_files.xml#raw';
-                var url = "https://api.eternitywall.com/archive-proxy/" + identifier;
-                return $http.get(url);
+            search: function(name) {
+                //https://alice.btc.calendar.opentimestamps.org/timestamp/e8fb8fa92c9c116f58c0d35d789939be69472529
+                //var url = "http://alice.btc.calendar.opentimestamps.org/timestamp/57cfa5c46716df9bd9e83595bce439c58108d8fcc1678f30d4c6731c3f1fa6c79ed712c66fb1ac8d4e4eb0e7";
+
+                var url = "https://crossorigin.me/";
+                url += "http://archive.ubuntu.com/ubuntu/pool/main/"+name[0]+"/"+name+"/";
+                var headers = {
+                    'User-Agent': 'Mozilla/5.0',
+                    'Content-Type': 'plain/text'
+                };
+                return $http({method:'Get',url:url,headers:headers});
             }
+
         }
     })
     .factory('OpenTimestampsService', function($http) {
         return {
             timestamp: function(hash) {
-                //https://alice.btc.calendar.opentimestamps.org/timestamp/e8fb8fa92c9c116f58c0d35d789939be69472529
-                //var url = "http://alice.btc.calendar.opentimestamps.org/timestamp/57cfa5c46716df9bd9e83595bce439c58108d8fcc1678f30d4c6731c3f1fa6c79ed712c66fb1ac8d4e4eb0e7";
-                var url = "https://internetarchive.calendar.opentimestamps.org/timestamp/";
+                //var url = "https://internetarchive.calendar.opentimestamps.org/timestamp/";
+                var url = "https://crossorigin.me/";
+                url += "http://52.170.200.141/timestamp/";
                 url += hash;
                 return $http.get(url,{responseType: "arraybuffer"});
+            }
+
+        }
+    })
+    .factory('PackagesService', function($http,$q) {
+        return {
+            search: function(repofile,name) {
+                var defer = $q.defer();
+                $http.get(repofile)
+                    .success(function(data) {
+                        //angular.extend(_this, data);
+                        //console.log(data);
+
+                        // check packages container
+                        var lines = data.split('\n');
+                        var found = -1;
+                        for (var i = 0; i < lines.length; i++){
+                            if(lines[i].indexOf("Package:")>=0 && lines[i].indexOf(name)>0){
+                                found = i;
+                                break;
+                            }
+                        }
+
+                        console.log(found);
+                        if(found==-1){
+                            return {};
+                        }
+
+                        var out={};
+                        for (var i=found;i < lines.length;i++){
+                            if (lines[i].length=="")
+                                break;
+                            var key = lines[i].substr(0,lines[i].indexOf(":"));
+                            var value = lines[i].substr(lines[i].indexOf(":")+2);
+                            out[key]=value;
+                        }
+
+                        defer.resolve(out);
+                    })
+                    .error(function() {
+                        defer.reject('could not find Packages.txt');
+                    });
+                return defer.promise;
             }
 
         }
@@ -42,41 +85,40 @@ angular.module('myApp.search', ['ngRoute'])
     .config(function($sceDelegateProvider) {
         $sceDelegateProvider.resourceUrlWhitelist(['**']);
     })
-.controller('SearchCtrl', function($scope, $routeParams, $location, $sce, ArchiveService, OpenTimestampsService, FileSaver, Blob) {
+.controller('SearchCtrl', function($scope, $routeParams, $location, $timeout, $sce, PackagesService, OpenTimestampsService, FileSaver, Blob) {
         $scope.results = [];
         $scope.input=$routeParams.text;
         $scope.showLoader=false;
         $scope.trust = $sce.trustAsHtml;
 
-        // Initialize pagination
-        $scope.page=1;
-        $scope.item4Page=50;
-        $scope.showMore=false;
+        var packagesList=[
+            "zesty.main.binary-amd64.Packages.txt",
+            "zesty.main.binary-i386.Packages.txt",
+            "zesty.multiverse.binary-amd64.Packages.txt",
+            "zesty.multiverse.binary-i386.Packages.txt",
+            "zesty.restricted.binary-amd64.Packages.txt",
+            "zesty.restricted.binary-i386.Packages.txt",
+            "zesty.universe.binary-amd64.Packages.txt",
+            "zesty.universe.binary-i386.Packages.txt"];
 
-
-        $scope.searching = function(text,page){
+        $scope.searching = function() {
+            if ($scope.input == "") {
+                return;
+            }
             $scope.showLoader = true;
-            ArchiveService.search(text,page).then(function(data){
-                $scope.showLoader=false;
 
-                data.data.response.docs.forEach(function(item){
-                    item.url = "https://archive.org/download/"+item.identifier+"/"+item.identifier+"_files.xml";
-                    var d = new Date(item.publicdate);
-                    var options = { year: 'numeric', month: 'long', day: 'numeric' };
-                    item.humanDate = d.toLocaleDateString("en",options);
-                    item.loading = false;
-
-                    $scope.results.push(item);
+            packagesList.forEach(function(repofile){
+                PackagesService.search("repo/"+repofile,$scope.input).then(function (data) {
+                    console.log(data);
+                    $scope.showLoader = false;
+                    data.success = "";
+                    data.error = "";
+                    data.humanFileSize = humanFileSize(data.Size);
+                    $scope.results.push(data);
+                }).catch(function(err){
+                    $scope.showLoader=false;
+                    console.error('ubuntu repository not reachable');
                 });
-
-                if(data.data.response.numFound - data.data.response.start < $scope.item4Page){
-                    $scope.showMore=false;
-                } else {
-                    $scope.showMore=true;
-                }
-            }).catch(function(err){
-                $scope.showLoader=false;
-                console.error('website archive.org not reachable');
             });
         };
 
@@ -84,70 +126,66 @@ angular.module('myApp.search', ['ngRoute'])
             $location.path( '/search/' + $scope.input);
         };
 
-        $scope.loadMore = function(){
-            $scope.page++;
-            $scope.searching($scope.input, $scope.page);
-        };
+        $scope.loadMore = function(){};
 
 
         // Startup load search
         if ($scope.input != undefined || $scope.input != ""){
             $scope.searching($scope.input, $scope.page);
         }
+        $scope.getOts = function(result){
+            OpenTimestampsService.timestamp(result.SHA1).then(function(data) {
+                console.log(data);
+                result.success = "Downloading and verifying...";
+
+                var timestamp=new Uint8Array(data.data);
+                var hexHeader = "004f70656e54696d657374616d7073000050726f6f6600bf89e2e884e8929401";
+                var hexOp = "02";
+                var hexHash = hash;
+                var container = hexToBytes(hexHeader+hexOp+hexHash);
+
+                //console.log(bin2String(data.data));
+                //console.log(hexToBytes(container));
+
+                var buffer = new Uint8Array(container.length + timestamp.length);
+                buffer.set(container);
+                buffer.set(timestamp, container.length);
+
+                var ots=bytesToHex(buffer);
+                result.ots=ots;
+                console.log(ots);
+                download(name+".ots",buffer);
+                result.download=false;
 
 
-
-        $scope.download = function($event, identifier){
-
-            // get scope result item
-            var result;
-            $scope.results.forEach(function(item){
-                if(item.identifier === identifier){
-                    result = item;
-                }
-            });
-            if(result === undefined) {
-                return;
-            }
-            result.loading = true;
-
-
-            ArchiveService.download(identifier).then(function(data){
-                //console.log(data.data);
-                var x2js = new X2JS();
-                var json  = x2js.xml_str2json(data.data);
-                //console.log(json);
-
-                // add files to result
-                result.loading = false;
-                result.files = json.files.file;
-
-                result.files.forEach(function(file){
-                    file.url = "https://archive.org/download/"+identifier+"/"+file._name;
-                    file.download = true;
-                    file.exist = true;
-                    file.error = "";
-                    file.success = "";
-
-                    if(!file.sha1) {
-                        file.download = false;
-                        file.exist = false;
+                const OpenTimestamps = require('javascript-opentimestamps');
+                OpenTimestamps.verify(buffer, hexToBytes(hash), true).then(function(result){
+                    if (result === undefined) {
+                        result.error='Pending or Bad attestation';
+                        console.log('Pending or Bad attestation');
+                    } else {
+                        result.success='Success! Bitcoin attests data existed as of ' + (new Date(result * 1000));
+                        console.log('Success! Bitcoin attests data existed as of ' + (new Date(result * 1000)));
                     }
-
-                    file.humanFileSize = file.size>0 ? humanFileSize(file.size) : "";
+                    $scope.$apply();
+                }).catch(function(err) {
+                    console.log(err);
+                    result.error = 'We are sorry, something failed, try with another browser';
+                    $scope.$apply();
                 });
 
+            }).catch(function(err){
+                console.log(err);
+                if(err instanceof ReferenceError) {
+                    result.error = 'Sorry, in-browser verification is not supported on your browser. Try with Chromium or <a href="https://github.com/opentimestamps/opentimestamps-client" style="text-decoration: underline;">client-side</a> validation';
+                } else {
+                    result.error = 'Sorry, timestamp not yet available for this file';
+                }
             });
         };
 
-        $scope.getFile = function(identifier,name){
-            ArchiveService.downloadFile(identifier,name).then(function(data) {
-                //console.log(data);
-                download(identifier,data.data);
-            });
-        };
 
-        $scope.getOts = function(identifier,hash,name){
+        /*$scope.getOts = function(identifier,hash,name){
             var element;
             OpenTimestampsService.timestamp(hash).then(function(data) {
                 //console.log(data);
@@ -208,40 +246,31 @@ angular.module('myApp.search', ['ngRoute'])
                   file.error = 'Sorry, timestamp not yet available for this file';
                 }
             });
-        };
+        };*/
 
         function humanFileSize(size) {
             var i = Math.floor( Math.log(size) / Math.log(1024) );
             return ( size / Math.pow(1024, i) ).toFixed(2) * 1 + ' ' + ['B', 'kB', 'MB', 'GB', 'TB'][i];
         };
 
-        function getDocumentFile(identifier,hash){
+        function getDocumentFile(package_name){
             // get scope result item
             var result;
-            var file;
             $scope.results.forEach(function(item){
-                if(item.identifier === identifier){
+                if(item.Package == package_name){
                     result = item;
                 }
             });
             if(result === undefined)
                 return;
-            result.files.forEach(function(item){
-                if(item.sha1 !== undefined && item.sha1 === hash){
-                    file=item;
-                }
-            });
-            if(file === undefined)
-                return;
-            return file;
-        }
 
+            return result;
+        }
 
         function download(filename,text){
             var data = new Blob([text], { type: 'octet/stream' });
             FileSaver.saveAs(data, filename);
         }
-
 
         function string2Bin(str) {
             var result = [];

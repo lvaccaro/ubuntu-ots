@@ -1,6 +1,6 @@
 .footer {
   padding: 25px 0;
-  background-color: #003b80;
+  background-color: #3d00ad;
 
   &-logo {
     @include image-2x('../images/logos@2x.png', 175px, 77px);
@@ -21,7 +21,7 @@
     background-size: 16px 13px;
     background-repeat: no-repeat;
     background-position: left center;
-    color: #f9f9f9;
+    color: #3d00ad;
     text-transform: uppercase;
     font-size: 12px;
     font-weight: bold;
