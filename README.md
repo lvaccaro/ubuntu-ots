@@ -1,15 +1,8 @@
-# Timestamping the Internet
+# Timestamping the Ubuntu packages
 
-The OpenTimestamps team has timestamped every item in the Internet Archive -
-about 750,000,000 files in total - and made those timestamps publically
-available via a [searchable
-database](https://opentimestamps.org/internet-archive/). This means that right
-now you can get timestamps for every book, movie, song, computer program, legal
-document, etc. in the thousands of collections in the archive. In the future we
-hope to be able to work with the Internet Archive to extend this to
-timestamping website snapshots. We're setting up infrastructure to continue
-timestamping new items as they're uploaded to the archive.
-
+The OpenTimestamps team has timestamped every package in the Ubuntu repositories
+and made those timestamps publically available via a [searchable
+database](https://opentimestamps.org/ubuntu/).
 
 
 ### Run the Application
